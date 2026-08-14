@@ -1,0 +1,12 @@
+{
+  "name": "dbern-skills",
+  "version": "1.0.0",
+  "description": "Elixir, Ecto, Phoenix and ExUnit conventions",
+  "author": {
+    "name": "David Bernheisel",
+    "url": "https://github.com/dbernheisel"
+  },
+  "homepage": "https://github.com/dbernheisel/skills",
+  "license": "MIT",
+  "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations"]
+}
