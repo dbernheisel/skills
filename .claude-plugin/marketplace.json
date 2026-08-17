@@ -10,7 +10,7 @@
     {
       "name": "dbern-skills",
       "source": "./",
-      "description": "Elixir, Ecto, Phoenix and ExUnit conventions",
+      "description": "Elixir conventions skill, review agents, and the /ship pipeline",
       "category": "skills",
       "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations"]
     }

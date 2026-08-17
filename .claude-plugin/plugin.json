@@ -1,7 +1,7 @@
 {
   "name": "dbern-skills",
-  "version": "1.0.0",
-  "description": "Elixir, Ecto, Phoenix and ExUnit conventions",
+  "version": "1.1.0",
+  "description": "Elixir conventions skill, review agents, and the /ship pipeline",
   "author": {
     "name": "David Bernheisel",
     "url": "https://github.com/dbernheisel"
