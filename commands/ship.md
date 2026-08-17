@@ -53,7 +53,7 @@ After the simplifier completes, re-run `mix format` and `mix compile --warnings-
 
 Run these two agents **in parallel** using the Agent tool in a single message:
 
-- **comms-reviewer** — summarizes the branch into a PR description and Slack message
+- **comms-reviewer** — summarizes the branch into a PR description
 - **product-manager** — pass it the comms-reviewer output after it completes, so it can search Linear for related issues and map the branch to company goals. The product-manager is allowed to create a new Linear issue under a clearly relevant project when no existing issue matches; if it does, call that out explicitly when presenting its output.
 
 Present the comms-reviewer results first. Then run the product-manager with those results and present its output.

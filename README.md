@@ -36,7 +36,7 @@ The migrations reference is derived from
 | `elixir-reviewer` | Opinionated review against OTP and BEAM principles |
 | `elixir-database-architect` | Ecto schema design, migration safety, PostgreSQL |
 | `ecto-index-optimizer` | Finds missing and redundant indexes |
-| `comms-reviewer` | Turns a branch into a PR description and Slack message |
+| `comms-reviewer` | Turns a branch into a PR description |
 | `product-manager` | Maps a branch to Linear issues and initiatives |
 
 `product-manager` needs the Linear MCP server connected.
