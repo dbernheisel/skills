@@ -16,6 +16,31 @@ including ones with no database and no web layer.
 `fetch_*` functions return {:ok, _} or {:error, _} signatures
 Look in docs/ for any relevant guides or documentation when searching for information
 
+## Before you implement
+
+The standard library, OTP, and the project's existing deps already solve most
+problems. Finding the right function beats writing one.
+
+1. Check `mix.exs` and `mix.lock` — know what is already in the project
+2. Search the docs for relevant modules and functions in Elixir, OTP, and every dep
+3. Check the OTP modules especially for cryptography (`:crypto`, `:public_key`,
+   `:ssl`), networking (`:gen_tcp`, `:gen_udp`, `:httpc`), data structures
+   (`:ets`, `:dets`, `:queue`), and encoding (`:base64`, `:uri_string`)
+4. Read the docs for functions you plan to use — options, edge cases, return types
+
+## Design priorities
+
+When two designs are both defensible, these lenses break the tie, in order:
+
+1. **Async over sync.** Default to `cast`, `send`, or PubSub. Reach for `call`
+   only when you need the reply or the backpressure.
+2. **Processes, not modules, hold state.** Design the topology — who supervises
+   whom, and what a restart means.
+3. **Let it crash.** Supervision over defensive rescues. Validate at boundaries.
+4. **Pattern match.** Function heads and guards over `case`/`cond` in bodies.
+5. **Compose pipelines.** Data in, data out; `Enum`/`Stream` over recursion.
+6. **Stay simple.** No abstraction until the third use case. Explicit over clever.
+
 ## Pattern Matching
 - Use pattern matching over conditional logic when possible
 - Prefer to match on function heads instead of using `if`/`else` or `case` or `cond` in function bodies
@@ -82,7 +107,7 @@ Look in docs/ for any relevant guides or documentation when searching for inform
 - Don't use `String.to_atom/1` on user input (memory leak risk)
 - Predicate function names should not start with `is_` and should end in a question mark. Names like `is_thing` should be reserved for guards
 - Elixir's builtin OTP primitives like `DynamicSupervisor` and `Registry`, require names in the child spec, such as `{DynamicSupervisor, name: MyApp.MyDynamicSup}`, then you can use `DynamicSupervisor.start_child(MyApp.MyDynamicSup, child_spec)`
-- Use `Task.async_stream(collection, callback, options)` for concurrent enumeration with back-pressure. The majority of times you will want to pass `timeout: :infinity` as option
+- Use `Task.async_stream(collection, callback, options)` for concurrent enumeration over a collection you already hold. It bounds concurrency; it is not a back-pressure mechanism (see "Concurrency and pipelines"). Usually pass `timeout: :infinity`
 
 ## Tooling
 
@@ -120,7 +145,40 @@ starting up and initialization.
 - Use `Task.Supervisor` for better fault tolerance
 - Handle task failures with `Task.yield/2` or `Task.shutdown/2`
 - Set appropriate task timeouts
-- Use `Task.async_stream/3` for concurrent enumeration with back-pressure
+
+## Concurrency and pipelines
+
+**Bounded concurrency is not back-pressure.** `Task.async_stream/3` caps how many
+items run at once (`max_concurrency`) over a collection you *already hold*. Real
+back-pressure means demand flows upstream to a producer that could otherwise
+outpace you — an external queue, a socket, a paged API. Picking the wrong one is
+how a service falls over under load rather than slowing down.
+
+The question that decides it: **who controls the rate?** If you do — you have the
+list — it's a Task. If something upstream does, you need demand.
+
+| Reach for | When |
+| --- | --- |
+| `Task.async_stream/3` | You hold the collection. Concurrent map over it, bounded. The default answer. |
+| `Task.Supervisor.async_nolink/3` | One-off concurrent work whose failure must not take the caller down. |
+| `Flow` | The collection is finite but too big for one pass, and the work needs aggregation — `group_by`, `reduce`, windowing. Task-plus-`Enum` cannot express it. |
+| `Broadway` | Ingesting from an external source that pushes or holds a backlog: RabbitMQ, SQS, Kafka, Pub/Sub. Gives batching, per-message acking, rate limiting, graceful drain. |
+| `GenStage` | A custom producer/consumer topology Flow and Broadway cannot express. Rare — both are built on it. Do not hand-roll what Broadway already does. |
+| `Oban` | The work must survive a restart, be retried with a schedule, or run once cluster-wide. Durability lives in Postgres, not in a process. |
+
+Notes that matter in review:
+
+- **RabbitMQ is a transport, not a processing model.** Reach for a broker when you
+  need durability across a deploy, retries with a dead-letter path, fan-out to
+  several consumers, or decoupling between services. Then consume it with
+  `broadway_rabbitmq` — a bare `GenServer` holding an AMQP channel has no
+  demand control and will happily prefetch itself to death.
+- **Already have Postgres and no broker?** `Oban` covers most of what teams reach
+  to RabbitMQ for, without the extra operational surface.
+- A `Task` that is really a background job is a bug: it dies with its caller and
+  vanishes on deploy. If losing it matters, it belongs in Oban.
+- `Flow` and `Broadway` are not interchangeable. Flow processes a collection to
+  completion; Broadway runs forever against a source.
 
 ## Elixir Usage Rules
 

@@ -72,6 +72,40 @@ Two constraints come with it:
 - Every *selected* column needs an equality operator. Scalars are fine, but a
   `json` column (as opposed to `jsonb`) has no `=` and will fail.
 
+## Indexes
+
+Assume PostgreSQL. `migrations.md` covers how to *ship* an index safely; this
+covers which index to reach for.
+
+Index the shapes the queries actually use — `where/3` filters, equality joins,
+`order_by/2` and `group_by/2` keys, soft-delete flags (`deleted_at IS NULL`),
+and boolean flags (`is_active = true`).
+
+- **Column order** for multi-column indexes: exact match first, then range, then
+  sort keys.
+- **btree** unless the access is equality-only on long keys, where hash may win.
+- **Partial** indexes for skewed boolean/enum filters and soft-deletes.
+- **Covering** indexes with `INCLUDE` to avoid the extra heap lookup.
+- Avoid very wide indexes, and avoid a low-selectivity leading column.
+
+Before dropping an index, confirm it does not back a PRIMARY KEY, UNIQUE,
+EXCLUDE, or FOREIGN KEY constraint, partitioning, or replication — those are
+never drop candidates regardless of query usage. What remains is fair game when
+it is a strict duplicate, redundant as a left-prefix of a better index, or has
+no matching predicate or ordering anywhere in the codebase.
+
+```elixir
+create index(:events, [:account_id, :inserted_at], concurrently: true)
+
+create index(:events, [:account_id], concurrently: true,
+       where: "deleted_at IS NULL", name: :events_account_id_active_index)
+
+drop_if_exists index(:events, [:account_id], concurrently: true)
+```
+
+`concurrently: true` needs `@disable_ddl_transaction true` in the migration —
+see `migrations.md`.
+
 ## Migrations
 
 When writing or reviewing Ecto migrations, read `migrations.md` for safe

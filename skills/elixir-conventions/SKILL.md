@@ -5,7 +5,10 @@ description: |
   projects. Use when writing, reviewing, or refactoring Elixir code. Trigger on
   any Elixir, Phoenix, LiveView, Ecto, GenServer, or OTP task. Also use when
   discussing naming conventions, module structure, callback patterns, flaky or
-  noisy tests, mocks, or test organization in Elixir projects. The guidance is
+  noisy tests, mocks, or test organization in Elixir projects, when choosing
+  between Task, Flow, GenStage, Broadway, Oban or a message broker for
+  concurrent or background work, and when deciding which indexes a table needs.
+  The guidance is
   split by layer so a project only loads what it uses: always read
   references/elixir-conventions.md (core Elixir, OTP); read
   references/testing.md only for ExUnit tests, references/ecto-conventions.md
@@ -27,3 +30,8 @@ web layer do not need the Ecto or Phoenix references.
 | Ecto migrations | `references/ecto-conventions.md` + `references/migrations.md` |
 | Routers, controllers, LiveViews, HEEx | `references/phoenix-conventions.md` |
 | ExUnit tests | `references/testing.md` |
+
+
+**ALWAYS look up documentation before writing any implementation.** The Elixir standard library, OTP, and project dependencies already solve many problems — your job is to find the right function, not rewrite it.
+
+**Tidewave MCP is your primary documentation tool.** If Tidewave is not available, STOP and ask the user to start it before proceeding. You cannot write good Elixir without access to docs.
