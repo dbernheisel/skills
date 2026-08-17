@@ -10,9 +10,9 @@
     {
       "name": "dbern-skills",
       "source": "./",
-      "description": "Elixir conventions skill, review agents, and the /ship pipeline",
+      "description": "Elixir conventions, domain-driven feature design, review agents, and the /ship pipeline",
       "category": "skills",
-      "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations"]
+      "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations", "ddd", "domain-driven-design", "architecture", "design"]
     }
   ]
 }

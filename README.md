@@ -29,6 +29,17 @@ The migrations reference is derived from
 [fly-apps/safe-ecto-migrations](https://github.com/fly-apps/safe-ecto-migrations)
 (`README.md` and `Backfilling.md`).
 
+### `domain-driven-feature-design`
+
+A five-phase procedure for turning a feature request into a design: establish the
+domain language, locate the bounded context, model the change, place the
+behavior, then pressure-test it against a table of structural smells. Outputs a
+design document, not a lecture. Language-agnostic, with a section on translating
+the patterns into Elixir.
+
+Includes a "when not to use this" section — CRUD screens, spikes, and generic
+subdomains do not get a modeling session.
+
 ## Agents
 
 | Agent | Does |

@@ -1,12 +1,12 @@
 {
   "name": "dbern-skills",
-  "version": "1.4.0",
-  "description": "Elixir conventions skill, review agents, and the /ship pipeline",
+  "version": "1.5.0",
+  "description": "Elixir conventions, domain-driven feature design, review agents, and the /ship pipeline",
   "author": {
     "name": "David Bernheisel",
     "url": "https://github.com/dbernheisel"
   },
   "homepage": "https://github.com/dbernheisel/skills",
   "license": "MIT",
-  "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations"]
+  "keywords": ["elixir", "ecto", "phoenix", "liveview", "exunit", "testing", "migrations", "ddd", "domain-driven-design", "architecture", "design"]
 }
