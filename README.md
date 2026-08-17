@@ -26,8 +26,8 @@ project only loads what it uses:
 | ExUnit tests | `references/testing.md` |
 
 The migrations reference is derived from
-[Safe Ecto Migrations](https://fly.io/phoenix-files/safe-ecto-migrations/) and
-[Backfilling Data](https://fly.io/phoenix-files/backfilling-data/).
+[fly-apps/safe-ecto-migrations](https://github.com/fly-apps/safe-ecto-migrations)
+(`README.md` and `Backfilling.md`).
 
 ## Agents
 

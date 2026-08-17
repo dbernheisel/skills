@@ -20,8 +20,12 @@ Several recipes below say "backfill data" as a step. **Read
 in the DDL migration is the single most common way these recipes go wrong in
 production.
 
-Read more about safe migrations at [Fly.io Phoenix Files](https://fly.io/phoenix-files/safe-ecto-migrations/)
-where we dive into how to safely backfill data and go through Ecto Migration options.
+Upstream source, kept current:
+[fly-apps/safe-ecto-migrations](https://github.com/fly-apps/safe-ecto-migrations)
+— see [Backfilling.md](https://github.com/fly-apps/safe-ecto-migrations/blob/main/Backfilling.md)
+for backfilling data and
+[Anatomy.md](https://github.com/fly-apps/safe-ecto-migrations/blob/main/Anatomy.md)
+for how Ecto migrations execute.
 
 ---
 
@@ -282,7 +286,7 @@ though it is never replaced.
 
 The full worked example, including the in-migration `MigratingSchema` and the
 `mutation/2` reducer, is in
-[Backfilling Data](https://fly.io/phoenix-files/backfilling-data/).
+[Backfilling.md](https://github.com/fly-apps/safe-ecto-migrations/blob/main/Backfilling.md).
 
 ---
 
