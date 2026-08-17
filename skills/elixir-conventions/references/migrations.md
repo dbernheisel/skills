@@ -2,6 +2,7 @@
 
 A non-exhaustive guide on common migration recipes and how to avoid trouble.
 
+- [Data migrations](#data-migrations)
 - [Adding an index](#adding-an-index)
 - [Adding a reference or foreign key](#adding-a-reference-or-foreign-key)
 - [Adding a column with a default value](#adding-a-column-with-a-default-value)
@@ -14,14 +15,274 @@ A non-exhaustive guide on common migration recipes and how to avoid trouble.
 - [Adding a JSON column](#adding-a-json-column)
 - [Squashing migrations](#squashing-migrations)
 
-> **Data migrations are not DDL migrations.** Anything that mutates row data
-> (backfills, re-encodes, cleanups) should use the project's dedicated data
-> migration mechanism so it does not run as part of the DDL deploy step. If the
-> project has no such mechanism, establish one with separately testable logic
-> and an explicit release task before adding the data change.
+Several recipes below say "backfill data" as a step. **Read
+[Data migrations](#data-migrations) before writing that step** — doing it inline
+in the DDL migration is the single most common way these recipes go wrong in
+production.
 
 Read more about safe migrations at [Fly.io Phoenix Files](https://fly.io/phoenix-files/safe-ecto-migrations/)
 where we dive into how to safely backfill data and go through Ecto Migration options.
+
+---
+
+## Data migrations
+
+**Data migrations are not DDL migrations.** Anything that mutates row data —
+backfills, re-encodes, cleanups, splitting a table — runs on a separate path
+from schema changes and is run manually, never as part of the DDL deploy step.
+
+Bulk data changes get code review like anything else. **Do not change data in
+bulk from an IEx console**: nothing reviewed it, nothing recorded it, and there
+is no way to resume it when it fails halfway.
+
+### Never reference your application's Ecto schemas
+
+This is the mistake that bites months later:
+
+```elixir
+# BAD — MyApp.MySchema is a moving target
+def change do
+  alter table("posts") do
+    add :new_data, :text
+  end
+
+  flush()
+
+  MyApp.MySchema
+  |> where(new_data: nil)
+  |> MyApp.Repo.update_all(set: [new_data: "some data"])
+end
+```
+
+A migration is a snapshot of the world when it was written; your schema keeps
+moving. When `new_data` is dropped or renamed two quarters from now, this
+migration fails for the next person who sets up the project. It also does the
+whole table at once, inside a transaction — 10 rows in development, a billion in
+production.
+
+Snapshot the table instead, one of two ways:
+
+1. **Query the table name directly** — `from(r in "weather", ...)`. No Ecto
+   schema, so nothing to drift. Prefer this.
+2. **Define a tiny Ecto schema inside the migration file** containing only the
+   fields this migration touches. Use this when you want the changeset/struct
+   API; it decouples from the app schema because it evolves separately.
+
+### The four keys to backfilling safely
+
+1. **Run outside a transaction.** Backfilling inside the migration transaction
+   locks row updates for the entire migration, even when you batch.
+2. **Batch.** Use [keyset pagination](https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/)
+   — `where: r.id > ^last_id` with `order_by` and `limit`. `LIMIT`/`OFFSET`
+   starts fast and slows to a crawl on later pages, and cursors need a
+   transaction you no longer have.
+3. **Throttle.** `Process.sleep(@throttle_ms)` between pages. Disabling the
+   transaction and batching still pins the database CPU at 100% without this,
+   timing out concurrent reads and writes.
+4. **Be resumable.** Track progress by the last mutated ID, not an offset, and
+   handle rows in unexpected states explicitly. You will re-run this. It must
+   pick up where it stopped and never revisit a migrated row.
+
+> `Process.sleep/1` is correct here. The "never `Process.sleep`" rule in
+> `elixir-conventions.md` is about GenServers and tests — a migration script is
+> neither, and there is no message to wait on.
+
+Key 1 is two module attributes at the top of the migration:
+
+```elixir
+@disable_ddl_transaction true
+@disable_migration_lock true
+```
+
+### Where data migrations live
+
+Keep them in their own directory so `mix ecto.migrate` cannot pick them up:
+
+```bash
+mix ecto.gen.migration --migrations-path=priv/repo/data_migrations backfill_posts
+```
+
+Extend the release module with a separate entry point, so running them is a
+deliberate act:
+
+```elixir
+defmodule MyApp.Release do
+  @doc """
+  Migrate data in the database. Defaults to `[all: true]`.
+  Also accepts `[step: 1]` or `[to: 20200118045751]`.
+  """
+  def migrate_data(opts \\ [all: true]) do
+    for repo <- repos() do
+      path = Ecto.Migrator.migrations_path(repo, "data_migrations")
+      {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, path, :up, opts))
+    end
+  end
+end
+```
+
+`Ecto.Migrator` is a fine starting point. If data migrations become a routine
+part of the process, graduate to something observable — error reporting,
+metrics, dry runs.
+
+### The batching helper
+
+Both patterns below share this. `down` is `:ok` — a backfill is not reversible.
+
+```elixir
+# BigInt/Int IDs start at 0; UUIDs at "00000000-0000-0000-0000-000000000000"
+defp throttle_change_in_batches(query_fun, change_fun, last_pos \\ 0)
+defp throttle_change_in_batches(_query_fun, _change_fun, nil), do: :ok
+
+defp throttle_change_in_batches(query_fun, change_fun, last_pos) do
+  case repo().all(query_fun.(last_pos), log: :info, timeout: :infinity) do
+    [] ->
+      :ok
+
+    ids ->
+      results = change_fun.(List.flatten(ids))
+      next_page = List.first(results)
+      Process.sleep(@throttle_ms)
+      throttle_change_in_batches(query_fun, change_fun, next_page)
+  end
+end
+
+defp handle_non_update(id) do
+  raise "#{inspect(id)} was not updated"
+end
+```
+
+### Deterministic backfills
+
+Use this when the query condition **disappears once the row is updated** — a
+null column being filled, a flag being set. The query itself tracks progress, so
+there is nothing extra to store.
+
+```elixir
+defmodule MyApp.Repo.DataMigrations.BackfillPosts do
+  use Ecto.Migration
+  import Ecto.Query
+
+  @disable_ddl_transaction true
+  @disable_migration_lock true
+  @batch_size 1000
+  @throttle_ms 100
+
+  def up, do: throttle_change_in_batches(&page_query/1, &do_change/1)
+  def down, do: :ok
+
+  def do_change(batch_of_ids) do
+    {_updated, results} =
+      repo().update_all(
+        from(r in "weather", select: r.id, where: r.id in ^batch_of_ids),
+        [set: [approved: true]],
+        log: :info
+      )
+
+    MapSet.new(batch_of_ids)
+    |> MapSet.difference(MapSet.new(results))
+    |> Enum.each(&handle_non_update/1)
+
+    Enum.sort(results)
+  end
+
+  def page_query(last_id) do
+    # Note the table name, not an Ecto schema.
+    from(r in "weather",
+      select: r.id,
+      where: is_nil(r.approved) and r.id > ^last_id,
+      order_by: [asc: r.id],
+      limit: @batch_size
+    )
+  end
+
+  # ... throttle_change_in_batches/3 and handle_non_update/1 from above
+end
+```
+
+### Arbitrary backfills
+
+Use this when the data **does not show whether it was already updated** — "add
+10 to every row" gives you no way to tell a migrated row from a fresh one. Load
+the work list into a real table rather than application memory, so a crash
+mid-migration does not lose your place.
+
+A real table, not a Postgres `TEMPORARY` table: temp tables die with the session,
+and a failed migration ends the session — taking your progress with it.
+
+1. Create the tracking table, populated with the IDs needing work. Pick a cutoff
+   where everything after it is known-good (`inserted_at < '2021-08-21'` once the
+   bug that made the bad data was deployed fixed).
+2. `create_if_not_exists index(@temp_table_name, [:id])` — an index, not a
+   primary key, so the migration is easy to re-run.
+3. Keyset-paginate the tracking table. Each batch runs in its own transaction
+   with `lock: "FOR UPDATE"` — milliseconds per batch, so concurrent traffic
+   barely notices.
+4. Compute the changes, then **upsert** them with `insert_all` and
+   `on_conflict: {:replace, [...]}`, `conflict_target: [:id]`. Every row
+   conflicts, since you are passing IDs that already exist.
+5. Delete those IDs from the tracking table inside the same transaction, then
+   throttle.
+6. Drop the tracking table when empty.
+
+```elixir
+def up do
+  repo().query!(
+    """
+    CREATE TABLE IF NOT EXISTS "#{@temp_table_name}" AS
+    SELECT id FROM weather WHERE inserted_at < '2021-08-21T00:00:00'
+    """,
+    [],
+    log: :info,
+    timeout: :infinity
+  )
+
+  flush()
+  create_if_not_exists index(@temp_table_name, [:id])
+  flush()
+
+  throttle_change_in_batches(&page_query/1, &do_change/1)
+
+  drop table(@temp_table_name)
+end
+
+def do_change(batch_of_ids) do
+  repo().transaction(fn ->
+    mutations =
+      from(r in MigratingSchema, where: r.id in ^batch_of_ids, lock: "FOR UPDATE")
+      |> repo().all()
+      |> Enum.reduce([], &mutation/2)
+
+    {_updated, results} =
+      repo().insert_all(MigratingSchema, mutations,
+        returning: [:id],
+        on_conflict: {:replace, [:temp_lo, :updated_at]},
+        conflict_target: [:id],
+        placeholders: %{now: NaiveDateTime.utc_now()},
+        log: :info
+      )
+
+    results = results |> Enum.map(& &1.id) |> Enum.sort()
+
+    mutations
+    |> Enum.map(& &1[:id])
+    |> MapSet.new()
+    |> MapSet.difference(MapSet.new(results))
+    |> Enum.each(&handle_non_update/1)
+
+    repo().delete_all(from(r in @temp_table_name, where: r.id in ^results))
+
+    results
+  end)
+end
+```
+
+Upserts do not touch autogenerated fields, so set `updated_at` yourself in the
+mutation. `inserted_at` still has to be present to satisfy table constraints even
+though it is never replaced.
+
+The full worked example, including the in-migration `MigratingSchema` and the
+`mutation/2` reducer, is in
+[Backfilling Data](https://fly.io/phoenix-files/backfilling-data/).
 
 ---
 
@@ -248,7 +509,7 @@ Take a phased approach:
 
 1. Create a new column
 1. In application code, write to both columns
-1. Backfill data from old column to new column
+1. Backfill data from old column to new column (see [Data migrations](#data-migrations))
 1. In application code, move reads from old column to the new column
 1. In application code, remove old column from Ecto schemas.
 1. Drop the old column.
@@ -362,7 +623,7 @@ Take a phased approach:
 
 1. Create a new column
 1. In application code, write to both columns
-1. Backfill data from old column to new column
+1. Backfill data from old column to new column (see [Data migrations](#data-migrations))
 1. In application code, move reads from old column to the new column
 1. In application code, remove old column from Ecto schemas.
 1. Drop the old column.
@@ -417,7 +678,7 @@ Take a phased approach:
 
 1. Create the new table. This should include creating new constraints (checks and foreign keys) that mimic behavior of the old table.
 1. In application code, write to both tables, continuing to read from the old table.
-1. Backfill data from old table to new table
+1. Backfill data from old table to new table (see [Data migrations](#data-migrations))
 1. In application code, move reads from old table to the new table
 1. In application code, remove the old table from Ecto schemas.
 1. Drop the old table.
@@ -504,7 +765,7 @@ end
 
 This will enforce the constraint in all new rows, but not care about existing rows until that row is updated.
 
-You'll likely need a data migration at this point to ensure that the constraint is satisfied.
+You'll likely need a [data migration](#data-migrations) at this point to ensure that the constraint is satisfied.
 
 Then, in the next deployment's migration, we'll enforce the constraint on all rows:
 

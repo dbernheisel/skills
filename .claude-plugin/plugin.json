@@ -1,6 +1,6 @@
 {
   "name": "dbern-skills",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Elixir conventions skill, review agents, and the /ship pipeline",
   "author": {
     "name": "David Bernheisel",

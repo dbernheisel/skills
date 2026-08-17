@@ -111,3 +111,9 @@ see `migrations.md`.
 When writing or reviewing Ecto migrations, read `migrations.md` for safe
 migration patterns covering indexes, foreign keys, column defaults, type
 changes, NOT NULL constraints, and squashing.
+
+**Anything that mutates row data is a data migration, not a schema migration.**
+Backfills, re-encodes, and cleanups live on a separate path, run manually, and
+must never reference your application's Ecto schemas. Read the "Data migrations"
+section of `migrations.md` before writing one — including when a schema migration
+needs a backfill as one of its steps.

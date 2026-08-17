@@ -7,8 +7,8 @@ description: |
   discussing naming conventions, module structure, callback patterns, flaky or
   noisy tests, mocks, or test organization in Elixir projects, when choosing
   between Task, Flow, GenStage, Broadway, Oban or a message broker for
-  concurrent or background work, and when deciding which indexes a table needs.
-  The guidance is
+  concurrent or background work, when deciding which indexes a table needs, and
+  when backfilling or bulk-changing existing row data. The guidance is
   split by layer so a project only loads what it uses: always read
   references/elixir-conventions.md (core Elixir, OTP); read
   references/testing.md only for ExUnit tests, references/ecto-conventions.md
@@ -28,6 +28,7 @@ web layer do not need the Ecto or Phoenix references.
 | Any Elixir at all | `references/elixir-conventions.md` |
 | Ecto schemas, changesets, queries | `references/ecto-conventions.md` |
 | Ecto migrations | `references/ecto-conventions.md` + `references/migrations.md` |
+| Backfilling or bulk-changing row data | `references/migrations.md` — "Data migrations" |
 | Routers, controllers, LiveViews, HEEx | `references/phoenix-conventions.md` |
 | ExUnit tests | `references/testing.md` |
 

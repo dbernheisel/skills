@@ -21,12 +21,13 @@ project only loads what it uses:
 | --- | --- |
 | Any Elixir | `references/elixir-conventions.md` |
 | Ecto schemas, changesets, queries | `references/ecto-conventions.md` |
-| Ecto migrations | `+ references/migrations.md` |
+| Ecto migrations, data migrations, backfills | `+ references/migrations.md` |
 | Routers, controllers, LiveViews, HEEx | `references/phoenix-conventions.md` |
 | ExUnit tests | `references/testing.md` |
 
 The migrations reference is derived from
-[Safe Ecto Migrations](https://fly.io/phoenix-files/safe-ecto-migrations/).
+[Safe Ecto Migrations](https://fly.io/phoenix-files/safe-ecto-migrations/) and
+[Backfilling Data](https://fly.io/phoenix-files/backfilling-data/).
 
 ## Agents
 
