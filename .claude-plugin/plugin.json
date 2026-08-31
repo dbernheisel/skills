@@ -1,6 +1,6 @@
 {
   "name": "dbern-skills",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Elixir conventions, domain-driven feature design, review agents, and the /ship pipeline",
   "author": {
     "name": "David Bernheisel",
