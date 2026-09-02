@@ -64,10 +64,6 @@ Activate when the user wants to:
 - Prototype loading spinners, progress rings, ambient backgrounds
 - Build a self-contained, script-free interactive SVG (SMIL `begin="el.click"`)
 
-For **interactive D3 / JS-driven** visualizations, prefer `preview-d3`. For
-**3D / WebGL** scenes, use `preview-threejs`. For **flowcharts / sequence
-diagrams**, use `preview-mermaid`.
-
 ## Authoring Guide
 
 ### Minimal animated SVG (SMIL)
