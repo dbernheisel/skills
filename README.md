@@ -12,6 +12,12 @@ Claude Code plugin marketplace.
 
 ## Skills
 
+### `visualize-svg`
+
+Creates and previews animated SVG explainers with playback controls, timeline
+scrubbing, zoom and pan, WebM export, and GitHub PR attachment guidance. Adapted from
+[veelenga/preview-skills](https://github.com/veelenga/preview-skills/tree/main/skills/preview-svg).
+
 ### `elixir-conventions`
 
 Elixir, Ecto, Phoenix and ExUnit conventions. The guidance is split by layer so a
